@@ -3,61 +3,61 @@
 date_default_timezone_set("Asia/Tokyo");
 
 $comment_array = array();
-$pdo = null;
-$stmt = null;
 $error_messages = array();
 
-//DB接続
-try{
-    $pdo = new PDO('mysql:host=localhost;dbname=bbs-kadai', "root", "");
-} catch (PDOException $e){
-    echo $e->getMessage();
-}
+// CSVファイルのパス
+$csv_file = 'comments.csv';
 
-//フォームを打ち込んだ時
-if (!empty($_POST["submitButton"])) {
+// フォームが送信されたとき
+if (isset($_POST["submitButton"])) {
 
-    //名前のチェック
+    // 名前のチェック
     if(empty($_POST["username"])){
-        echo "名前を入力してください";
         $error_messages["username"] = "名前を入力してください";
     }
 
+    // コメントのチェック
     if(empty($_POST["comment"])){
-        echo "内容を入力してください";
         $error_messages["comment"] = "内容を入力してください";
     }
 
-    if (empty($error_messages)){
-
+    // エラーメッセージがない場合、データを保存
+    if (empty($error_messages)) {
         $postDate = date("Y-m-d H:i:s");
 
-        try {
-            $stmt = $pdo->prepare("INSERT INTO `bbs-table` (`username`, `comment`, `postDate`) VALUES (:username, :comment, :postDate);");
-            $stmt->bindParam(':username', $_POST['username'], PDO::PARAM_STR);
-            $stmt->bindParam(':comment', $_POST['comment'], PDO::PARAM_STR); 
-            $stmt->bindParam(':postDate', $postDate, PDO::PARAM_STR); 
+        // 保存するデータを準備
+        $new_entry = array($_POST["username"], $_POST["comment"], $postDate);
 
-            $stmt->execute();
-        } catch(PDOException $e){
-        echo $e->getMessage();
+        // CSVファイルに追記
+        if ($file = fopen($csv_file, 'a')) {
+            fputcsv($file, $new_entry);
+            fclose($file);
+        } else {
+            echo "ファイルに書き込めませんでした。";
         }
-
     }
-
 }
 
-//DBからコメントデータを取得する
-$sql = "SELECT `id`,`username`,`comment`,`postDate` FROM `bbs-table`";
-$comment_array = $pdo->query($sql);
-
-//DBの接続を閉じる
-$pdo = null;
+// CSVファイルからコメントデータを取得
+if (file_exists($csv_file)) {
+    if ($file = fopen($csv_file, 'r')) {
+        while (($data = fgetcsv($file)) !== FALSE) {
+            $comment_array[] = array(
+                'username' => $data[0],
+                'comment' => $data[1],
+                'postDate' => $data[2]
+            );
+        }
+        fclose($file);
+    } else {
+        echo "ファイルを読み込めませんでした。";
+    }
+}
 
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -69,18 +69,20 @@ $pdo = null;
     <hr>
     <div class="boardWrapper">
         <section>
-            <?php foreach ($comment_array as $comment): ?>
-            <article>
-                <div class="wrapper">
-                    <div class="nameArea">
-                        <span>名前：</span>
-                        <p class="username"><?php echo $comment["username"]; ?></p>
-                        <time>：<?php echo $comment["postDate"]; ?></time>
+            <?php if (!empty($comment_array)): ?>
+                <?php foreach ($comment_array as $comment): ?>
+                <article>
+                    <div class="wrapper">
+                        <div class="nameArea">
+                            <span>名前：</span>
+                            <p class="username"><?php echo htmlspecialchars($comment["username"], ENT_QUOTES, 'UTF-8'); ?></p>
+                            <time>：<?php echo htmlspecialchars($comment["postDate"], ENT_QUOTES, 'UTF-8'); ?></time>
+                        </div>
+                        <p class="comment"><?php echo htmlspecialchars($comment["comment"], ENT_QUOTES, 'UTF-8'); ?></p>
                     </div>
-                    <p class="comment"><?php echo $comment["comment"]; ?></p>
-                </div>
-            </article>
-            <?php endforeach; ?>
+                </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </section>
         <form class="formwrapper" method="POST">
             <div>
